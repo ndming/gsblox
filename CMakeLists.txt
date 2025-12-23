@@ -17,6 +17,15 @@ endif()
 set(CMAKE_BUILD_PARALLEL_LEVEL ${used_cores} CACHE INTERNAL "" FORCE)
 message(STATUS "Building with ${used_cores} cores (total: ${total_cores})")
 
+if(CMAKE_CUDA_ARCHITECTURES)
+    message(STATUS "Building with user-provided CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+else()
+    message(FATAL_ERROR "Please set CMAKE_CUDA_ARCHITECTURES")
+endif()
+
 # Set the project name and version. Note that this will also set
 # CMAKE_CUDA_ARCHITECTURES to a default (potentially non-native) value
 project(GsBlox VERSION 0.0.1 LANGUAGES CXX C CUDA)
+
+# 3rd-party dependencies
+add_subdirectory(third_party)
