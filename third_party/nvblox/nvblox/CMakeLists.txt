@@ -18,10 +18,10 @@ message(STATUS "Downloading STDGPU")
 include(thirdparty/stdgpu/stdgpu.cmake)
 message(STATUS "Downloading GLOG")
 include(thirdparty/glog/glog.cmake)
-message(STATUS "Downloading GTEST")
-include(thirdparty/gtest/gtest.cmake)
-message(STATUS "Downloading benchmark")
-include(thirdparty/benchmark/benchmark.cmake)
+# message(STATUS "Downloading GTEST")
+# include(thirdparty/gtest/gtest.cmake)
+# message(STATUS "Downloading benchmark")
+# include(thirdparty/benchmark/benchmark.cmake)
 
 # Enable compiler warnings. We do this after inclusion of third party libraries
 # to avoid warnings we have no control over TODO(dtingdahl) Fix pytorch warnings
@@ -158,14 +158,14 @@ add_nvblox_shared_library(
 # nvblox_stdgpu and nvblox_gpu_hash to get some transitive dependencies. This
 # should not be required, as isn't required on JP6/7. Remove this overlinking
 # once JP5 is no longer supported.
-add_nvblox_executable(
-  sphere_benchmark
-  SOURCE_FILES
-  src/benchmarks/sphere_benchmark.cpp
-  LINK_LIBRARIES_PUBLIC
-  nvblox_lib
-  nvblox_stdgpu
-  nvblox_gpu_hash)
+# add_nvblox_executable(
+#   sphere_benchmark
+#   SOURCE_FILES
+#   src/benchmarks/sphere_benchmark.cpp
+#   LINK_LIBRARIES_PUBLIC
+#   nvblox_lib
+#   nvblox_stdgpu
+#   nvblox_gpu_hash)
 
 # Binaries for specific datasets
 add_subdirectory(executables)
@@ -176,9 +176,8 @@ add_subdirectory(examples)
 #
 # TESTS #
 #
-include(CTest)
-
 if(BUILD_TESTING)
+  include(CTest)
   enable_testing()
   add_subdirectory(tests)
 endif()

@@ -12,6 +12,10 @@ else()
 
   FetchContent_MakeAvailable(ext_sqlite3)
   target_include_directories(sqlite3 PUBLIC ${sqlite3_SOURCE_DIR}/src)
+  target_compile_options(sqlite3 PRIVATE
+          -Wno-return-local-addr
+          -Wno-stringop-overflow
+  )
 
   # Apply nvblox compile options to exported targets
   set_nvblox_compiler_options_nowarnings(sqlite3)
