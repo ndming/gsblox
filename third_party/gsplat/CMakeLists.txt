@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
 
-find_package(Torch REQUIRED QUIET) # Set Torch_DIR to <path/to/libtorch>/share/cmake/Torch
-find_package(glm REQUIRED QUIET)   # sudo apt-get -y install libglm-dev
-
 # Gather .cpp and .cu files and add gsplat_cuda lib
 file(GLOB GSPLAT_CUDA_SOURCES "src/cuda/*.cu" "src/cuda/*.cpp")
 add_library(gsplat_cuda STATIC ${GSPLAT_CUDA_SOURCES})
@@ -27,7 +24,7 @@ target_compile_options(gsplat_cuda PRIVATE
 target_compile_options(gsplat_cuda PRIVATE
         $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:-O0 -g -G>
         $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Release>>:-O3 --use_fast_math>
-        # GLM/Torch has spammy and very annoyingly verbose warnings that this suppresses
+        # GLM and Torch have spammy and very annoyingly verbose warnings that this suppresses
         $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr -diag-suppress=20012,186>
 )
 
