@@ -10,6 +10,7 @@ gsblox::ReplicaReader::ReplicaReader(const ReaderConfig& config)
 {
     if (!_traj_file.is_open()) {
         spdlog::error("Could NOT open trajectory file at: {}", (config.scene_dir / "traj.txt").string());
+        return; // empty reader
     }
 
     auto line = std::string{};
@@ -36,7 +37,7 @@ gsblox::Reader::ReadStatus gsblox::ReplicaReader::read_depth(nvblox::DepthImage*
     auto ss = std::stringstream{};
     ss << "depth" << std::setfill('0') << std::setw(6) << _curr_frame << ".png";
     const auto file = _config.scene_dir / "results" / ss.str();
-    return utils::load_16bit_depth_image(file, depth, _config.depth_scale) ? ReadStatus::Consumed : ReadStatus::Failed;
+    return utils::load_16bit_depth_image(file, depth, _config.depth_multiplier) ? ReadStatus::Consumed : ReadStatus::Failed;
 }
 
 template <typename Derived>

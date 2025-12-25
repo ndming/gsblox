@@ -173,7 +173,7 @@ gsblox::TumRgbDReader::TumRgbDReader(
 
     // We may not have color images at all, check if a rgb.txt presents first
     if (const auto color_list_file = config.scene_dir / "rgb.txt"; std::filesystem::exists(color_list_file)) {
-        if (const auto color_images = read_list_file(color_list_file); !color_images.empty()) {
+        if (auto color_images = read_list_file(color_list_file); !color_images.empty()) {
             // indices has the same size as depth_images (hence _frames), whose values indexing into color_images,
             // where values of -1 indicate that there was not a color image satisfying max_timestamp_difference
             const auto indices = find_associated_indices(depth_images, color_images, max_timestamp_difference);
@@ -204,7 +204,7 @@ gsblox::Reader::ReadStatus gsblox::TumRgbDReader::read_depth(nvblox::DepthImage*
         return ReadStatus::Skipped;
     }
     const auto file = _config.scene_dir / _frames[_curr_frame].depth_path;
-    return utils::load_16bit_depth_image(file, depth, _config.depth_scale) ? ReadStatus::Consumed : ReadStatus::Failed;
+    return utils::load_16bit_depth_image(file, depth, _config.depth_multiplier) ? ReadStatus::Consumed : ReadStatus::Failed;
 }
 
 gsblox::Reader::ReadStatus gsblox::TumRgbDReader::read_c2w_color(nvblox::Transform* c2w) {

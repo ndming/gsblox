@@ -3,6 +3,7 @@
 #include <nvblox/sensors/image.h>
 
 #include <filesystem>
+#include <utility>
 
 namespace gsblox {
 
@@ -22,7 +23,7 @@ struct ReaderConfig {
     /// The underlying reader implementation, print it with to_string(type)
     ReaderType type = ReaderType::Unknown;
     /// Depth values are multiplied by this factor before returning to the call site
-    float depth_scale = 1.0f;
+    float depth_multiplier = 1.0f;
     /// Reader will consume frames at this FPS rate, or unlimited if set to 0
     float fps = 0.0f;
     /// Drop frames when processing cannot keep up with the target FPS
@@ -41,17 +42,17 @@ public:
         Failed,
     };
 
-    explicit Reader(const ReaderConfig& config)
-        : _config{ config }
+    explicit Reader(ReaderConfig config)
+        : _config{std::move( config )}
         , _num_frames{ 0 }
         , _curr_frame{ 0 }
         , _last_frame_time{ std::chrono::steady_clock::now() }
     {
     }
 
-    ReadStatus next(nvblox::ColorImage* color);
-    ReadStatus next(nvblox::Transform* c2w);
-    ReadStatus next(nvblox::ColorImage* color, nvblox::Transform* c2w);
+    ReadStatus next(nvblox::ColorImage* color, uint32_t* sensor_id = nullptr);
+    ReadStatus next(nvblox::Transform* c2w, uint32_t* sensor_id = nullptr);
+    ReadStatus next(nvblox::ColorImage* color, nvblox::Transform* c2w, uint32_t* sensor_id = nullptr);
 
     [[nodiscard]] uint32_t count() const { return _num_frames; }
     [[nodiscard]] bool exhausted() const { return _curr_frame >= _num_frames; }
@@ -63,6 +64,11 @@ protected:
 
     virtual ReadStatus read_c2w_color(nvblox::Transform* c2w) {
         *c2w = nvblox::Transform::Identity();
+        return ReadStatus::Consumed;
+    }
+
+    virtual ReadStatus get_sensor(uint32_t* sensor_id) const {
+        if (sensor_id) *sensor_id = 0;
         return ReadStatus::Consumed;
     }
 
@@ -89,13 +95,14 @@ public:
     explicit RgbDReader(const ReaderConfig& config) : Reader{ config } {}
 
     using Reader::next;
-    ReadStatus next(nvblox::DepthImage* depth);
-    ReadStatus next(nvblox::Transform* c2w_color, nvblox::Transform* c2w_depth);
-    ReadStatus next(nvblox::ColorImage* color, nvblox::DepthImage* depth);
-    ReadStatus next(nvblox::ColorImage* color, nvblox::DepthImage* depth, nvblox::Transform* c2w);
+    ReadStatus next(nvblox::DepthImage* depth, uint32_t* sensor_id = nullptr);
+    ReadStatus next(nvblox::Transform* c2w_color, nvblox::Transform* c2w_depth, uint32_t* sensor_id = nullptr);
+    ReadStatus next(nvblox::ColorImage* color, nvblox::DepthImage* depth, uint32_t* sensor_id = nullptr);
+    ReadStatus next(nvblox::ColorImage* color, nvblox::DepthImage* depth, nvblox::Transform* c2w, uint32_t* sensor_id = nullptr);
     ReadStatus next(
         nvblox::ColorImage* color, nvblox::Transform* c2w_color,
-        nvblox::DepthImage* depth, nvblox::Transform* c2w_depth);
+        nvblox::DepthImage* depth, nvblox::Transform* c2w_depth,
+        uint32_t* sensor_id = nullptr);
 
 protected:
     virtual ReadStatus read_depth(nvblox::DepthImage* depth) = 0;

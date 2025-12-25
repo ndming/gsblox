@@ -1,30 +1,75 @@
-#include <gsblox/readers/tum_rgbd.hpp>
-#include <gsblox/utils/path.hpp>
+#include "gsblox/readers/replica.hpp"
+#include "gsblox/readers/tum_rgbd.hpp"
+#include "gsblox/utils/path.hpp"
+#include "gsblox/utils/sensor.hpp"
+
+#include <nvblox/mapper/multi_mapper.h>
 
 #include <opencv2/opencv.hpp>
 #include <spdlog/spdlog.h>
 
 int main(int argc, char* argv[]) {
-    auto config = gsblox::ReaderConfig{};
-    config.scene_dir = gsblox::utils::make_norm(argv[1]);
-    config.depth_scale = 1.0f / 5000.f;
-    config.type = gsblox::ReaderType::TumRgbD;
+    // Redirect nvblox log to files
+    google::InitGoogleLogging(argv[0]);
+    FLAGS_logtostderr = false;
+    FLAGS_log_dir = "output/nvblox/replica/log";
 
-    auto reader = gsblox::TumRgbDReader{ config };
-    spdlog::info("Frame count: {}", reader.count());
+    if (argc < 2) {
+        spdlog::error("Please provide path to a config file at arg 1");
+        return EXIT_FAILURE;
+    }
 
-    const auto color_image = std::make_shared<nvblox::ColorImage>(nvblox::MemoryType::kHost);
-    const auto depth_image = std::make_shared<nvblox::DepthImage>(nvblox::MemoryType::kHost);
+    const auto config_file = gsblox::utils::make_norm(argv[1]);
+    spdlog::info("Config file: {}", config_file.string());
+
+    const auto reader = gsblox::ReplicaReader::create(config_file);
+    spdlog::info("Frame count: {}", reader->count());
+    if (reader->count() == 0) {
+        spdlog::error("Could NOT create reader");
+        return EXIT_FAILURE;
+    }
+
+    const auto sensors = gsblox::utils::read_sensors(config_file);
+    spdlog::info("Found {} sensor(s):", sensors.size());
+    for (const auto& sensor : sensors) {
+        spdlog::info(
+            "- {}: w={} h={}, fx={}, fy={}, cx={}, cy={}",
+            sensor.type, sensor.width, sensor.height, sensor.fx, sensor.fy, sensor.cx, sensor.cy);
+    }
+
+    const auto color_image = std::make_shared<nvblox::ColorImage>(nvblox::MemoryType::kUnified);
+    const auto depth_image = std::make_shared<nvblox::DepthImage>(nvblox::MemoryType::kUnified);
     auto c2w = Eigen::Isometry3f::Identity();
 
-    while (!reader.exhausted()) {
-        reader.next(color_image.get(), depth_image.get(), &c2w);
-        // spdlog::info("Pose: {}", c2w.matrix());
+    const auto multi_mapper = std::make_unique<nvblox::MultiMapper>(
+        0.02, // voxel size
+        nvblox::MappingType::kStaticTsdf,
+        nvblox::EsdfMode::k3D
+    );
+
+    const auto camera = nvblox::Camera{
+        sensors[0].fx, sensors[0].fy, sensors[0].cx, sensors[0].cy,
+        static_cast<int>(sensors[0].width), static_cast<int>(sensors[0].height) };
+
+    while (!reader->exhausted()) {
+        if (const auto read_status = reader->next(color_image.get(), depth_image.get(), &c2w);
+            read_status == gsblox::Reader::ReadStatus::Skipped) {
+            continue;
+        }
+
+        multi_mapper->integrateDepth(*depth_image, c2w, camera);
+        multi_mapper->integrateColor(*color_image, c2w, camera);
+        multi_mapper->updateColorMesh();
+        multi_mapper->updateEsdf();
 
         cv::Mat color(color_image->height(), color_image->width(),  CV_8UC3, color_image->dataPtr());
         cv::Mat depth(depth_image->height(), depth_image->width(), CV_32FC1, depth_image->dataPtr());
 
         constexpr float max_depth = 5.0f; // meters
+
+        // RGB -> BGR
+        cv::Mat color_bgr;
+        cv::cvtColor(color, color_bgr, cv::COLOR_RGB2BGR);
 
         // Clamp depth values
         cv::Mat depth_clamped;
@@ -36,16 +81,18 @@ int main(int argc, char* argv[]) {
 
         // Optional colormap
         cv::Mat depth_color;
-        cv::applyColorMap(depth_u8, depth_color, cv::COLORMAP_TURBO);
+        cv::applyColorMap(depth_u8, depth_color, cv::COLORMAP_CIVIDIS);
 
         cv::Mat combined;
-        cv::hconcat(color, depth_color, combined);
+        cv::hconcat(color_bgr, depth_color, combined);
 
         cv::imshow("Color | Depth", combined);
+        cv::waitKey(1);
+    }
 
-        if (int key = cv::waitKey(0); key == 27) {
-            break;
-        }
+    const auto mesh_output_file = gsblox::utils::make_norm("output/nvblox/replica/office0.ply");
+    if (!multi_mapper->background_mapper()->saveColorMeshAsPly(mesh_output_file.string())) {
+        spdlog::error("Failed to save color mesh: {}", mesh_output_file.string());
     }
 
     return 0;

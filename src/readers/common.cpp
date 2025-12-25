@@ -80,8 +80,12 @@ gsblox::ReaderConfig gsblox::ReaderConfig::from_yaml(const std::filesystem::path
     read_yaml_node(reader_node, "scene_dir", &scene_dir_str);
     config.scene_dir = utils::make_norm(scene_dir_str);
 
+    // Depth scale -> depth multiplier
+    auto depth_scale = 1.0f;
+    read_yaml_node(reader_node, "depth_scale", &depth_scale);
+    config.depth_multiplier = 1.0f / depth_scale;
+
     // Get the remaining config vars
-    read_yaml_node(reader_node, "depth_scale", &config.depth_scale);
     read_yaml_node(reader_node, "fps", &config.fps);
     read_yaml_node(reader_node, "drop_frames", &config.drop_frames);
     read_yaml_node(reader_node, "is_live", &config.is_live);
@@ -89,20 +93,20 @@ gsblox::ReaderConfig gsblox::ReaderConfig::from_yaml(const std::filesystem::path
     return config;
 }
 
-gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::ColorImage* color) {
-    const auto status = read_color(color);
+gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::ColorImage* color, uint32_t* sensor_id) {
+    const auto status = read_color(color) + get_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }
 
-gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::Transform* c2w) {
-    const auto status = read_c2w_color(c2w);
+gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::Transform* c2w, uint32_t* sensor_id) {
+    const auto status = read_c2w_color(c2w) + get_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }
 
-gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::ColorImage* color, nvblox::Transform* c2w) {
-    const auto status = read_color(color) + read_c2w_color(c2w);
+gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::ColorImage* color, nvblox::Transform* c2w, uint32_t* sensor_id) {
+    const auto status = read_color(color) + read_c2w_color(c2w) + get_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }
@@ -126,7 +130,7 @@ void gsblox::Reader::wait_then_increment(const ReadStatus status) {
         const auto seconds_to_sleep = spf - elapsed;
         std::this_thread::sleep_for(duration<float>(seconds_to_sleep));
     } else if (_config.drop_frames && _curr_frame != 0) {
-        const auto frames_to_skip = std::ceil(elapsed * _config.fps);
+        const auto frames_to_skip = static_cast<uint32_t>(std::ceil(elapsed * _config.fps));
         _curr_frame += frames_to_skip;
     } else {
         ++_curr_frame;
@@ -135,20 +139,20 @@ void gsblox::Reader::wait_then_increment(const ReadStatus status) {
     _last_frame_time = steady_clock::now();
 }
 
-gsblox::Reader::ReadStatus gsblox::RgbDReader::next(nvblox::DepthImage* depth) {
-    const auto status = read_depth(depth);
+gsblox::Reader::ReadStatus gsblox::RgbDReader::next(nvblox::DepthImage* depth, uint32_t* sensor_id) {
+    const auto status = read_depth(depth) + get_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }
 
-gsblox::Reader::ReadStatus gsblox::RgbDReader::next(nvblox::Transform* c2w_color, nvblox::Transform* c2w_depth) {
-    const auto status = read_c2w_color(c2w_color) + read_c2w_depth(c2w_depth);
+gsblox::Reader::ReadStatus gsblox::RgbDReader::next(nvblox::Transform* c2w_color, nvblox::Transform* c2w_depth, uint32_t* sensor_id) {
+    const auto status = read_c2w_color(c2w_color) + read_c2w_depth(c2w_depth) + get_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }
 
-gsblox::Reader::ReadStatus gsblox::RgbDReader::next(nvblox::ColorImage* color, nvblox::DepthImage* depth) {
-    const auto status = read_color(color) + read_depth(depth);
+gsblox::Reader::ReadStatus gsblox::RgbDReader::next(nvblox::ColorImage* color, nvblox::DepthImage* depth, uint32_t* sensor_id) {
+    const auto status = read_color(color) + read_depth(depth) + get_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }
@@ -156,18 +160,22 @@ gsblox::Reader::ReadStatus gsblox::RgbDReader::next(nvblox::ColorImage* color, n
 gsblox::Reader::ReadStatus gsblox::RgbDReader::next(
     nvblox::ColorImage* color,
     nvblox::DepthImage* depth,
-    nvblox::Transform* c2w)
+    nvblox::Transform* c2w,
+    uint32_t* sensor_id)
 {
-    const auto status = read_color(color) + read_depth(depth) + read_c2w_color(c2w);
+    const auto status = read_color(color) + read_depth(depth) + read_c2w_color(c2w) + get_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }
 
 gsblox::Reader::ReadStatus gsblox::RgbDReader::next(
     nvblox::ColorImage* color, nvblox::Transform* c2w_color,
-    nvblox::DepthImage* depth, nvblox::Transform* c2w_depth)
+    nvblox::DepthImage* depth, nvblox::Transform* c2w_depth,
+    uint32_t* sensor_id)
 {
-    const auto status = read_color(color) + read_c2w_color(c2w_color) + read_depth(depth) + read_c2w_depth(c2w_depth);
+    const auto status = read_color(color) + read_c2w_color(c2w_color)
+                      + read_depth(depth) + read_c2w_depth(c2w_depth)
+                      + get_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }

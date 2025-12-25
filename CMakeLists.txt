@@ -76,6 +76,7 @@ add_executable(gsblox
         src/readers/tum_rgbd.cpp
         src/utils/image.cpp
         src/utils/path.cpp
+        src/utils/sensor.cpp
         src/main.cpp
 )
 # Treat all warnings as error

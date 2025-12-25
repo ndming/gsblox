@@ -156,9 +156,9 @@ void Fuser::integrateFrames() {
          integrateFrame(frame_number++) !=
              datasets::DataLoadResult::kNoMoreData) {
     timing::mark("Frame " + std::to_string(frame_number - 1), Color::Red());
-    LOG(INFO) << "Integrating frame " << frame_number - 1;
+    // LOG(INFO) << "Integrating frame " << frame_number - 1;
   }
-  LOG(INFO) << "Ran out of data at frame: " << frame_number - 1;
+  // LOG(INFO) << "Ran out of data at frame: " << frame_number - 1;
 }
 
 datasets::DataLoadResult Fuser::integrateFrame(const int frame_number) {
