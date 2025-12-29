@@ -1,7 +1,8 @@
-#include "gsblox/readers/replica.hpp"
-#include "gsblox/readers/tum_rgbd.hpp"
+#include "gsblox/reader.hpp"
+#include "gsblox/sensor.hpp"
+
+#include "gsblox/utils/io.hpp"
 #include "gsblox/utils/path.hpp"
-#include "gsblox/utils/sensor.hpp"
 
 #include <nvblox/mapper/multi_mapper.h>
 
@@ -9,11 +10,6 @@
 #include <spdlog/spdlog.h>
 
 int main(int argc, char* argv[]) {
-    // Redirect nvblox log to files
-    google::InitGoogleLogging(argv[0]);
-    FLAGS_logtostderr = false;
-    FLAGS_log_dir = "output/nvblox/replica/log";
-
     if (argc < 2) {
         spdlog::error("Please provide path to a config file at arg 1");
         return EXIT_FAILURE;
@@ -22,14 +18,22 @@ int main(int argc, char* argv[]) {
     const auto config_file = gsblox::utils::make_norm(argv[1]);
     spdlog::info("Config file: {}", config_file.string());
 
-    const auto reader = gsblox::ReplicaReader::create(config_file);
+    const auto out_dir = gsblox::utils::prepare_out_dir(config_file);
+    if (out_dir.empty()) {
+        spdlog::error("Could NOT prepare output directory");
+        return EXIT_FAILURE;
+    }
+
+    gsblox::utils::prepare_log_dir(argv[0], out_dir);
+
+    const auto reader = gsblox::reader::create(config_file);
     spdlog::info("Frame count: {}", reader->count());
     if (reader->count() == 0) {
         spdlog::error("Could NOT create reader");
         return EXIT_FAILURE;
     }
 
-    const auto sensors = gsblox::utils::read_sensors(config_file);
+    const auto sensors = gsblox::sensor::read(config_file);
     spdlog::info("Found {} sensor(s):", sensors.size());
     for (const auto& sensor : sensors) {
         spdlog::info(
@@ -46,14 +50,18 @@ int main(int argc, char* argv[]) {
         nvblox::MappingType::kStaticTsdf,
         nvblox::EsdfMode::k3D
     );
+    multi_mapper->background_mapper()->tsdf_integrator().max_integration_distance_m(2.5);
 
     const auto camera = nvblox::Camera{
         sensors[0].fx, sensors[0].fy, sensors[0].cx, sensors[0].cy,
         static_cast<int>(sensors[0].width), static_cast<int>(sensors[0].height) };
 
+    auto frame = 0u;
     while (!reader->exhausted()) {
         if (const auto read_status = reader->next(color_image.get(), depth_image.get(), &c2w);
             read_status == gsblox::Reader::ReadStatus::Skipped) {
+            spdlog::warn("Skipped frame {}", frame);
+            ++frame;
             continue;
         }
 
@@ -88,9 +96,11 @@ int main(int argc, char* argv[]) {
 
         cv::imshow("Color | Depth", combined);
         cv::waitKey(1);
+
+        ++frame;
     }
 
-    const auto mesh_output_file = gsblox::utils::make_norm("output/nvblox/replica/office0.ply");
+    const auto mesh_output_file = out_dir / "tsdf.ply";
     if (!multi_mapper->background_mapper()->saveColorMeshAsPly(mesh_output_file.string())) {
         spdlog::error("Failed to save color mesh: {}", mesh_output_file.string());
     }

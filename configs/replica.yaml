@@ -9,6 +9,7 @@ sensors:
     fy:     600.0
     cx:     599.5
     cy:     339.5
+
 reader:
   reader_type: replica
   scene_dir:   ~/datasets/replica/office0
@@ -16,8 +17,11 @@ reader:
   fps:         0.0
   drop_frames: false
   is_live:     false
+
 fuser:
   mapping_type: tsdf_static
   esdf_mode:    3D
   voxel_size:   0.02
   color_frame_subsampling: 20
+
+output_dir: "output/replica/office0"

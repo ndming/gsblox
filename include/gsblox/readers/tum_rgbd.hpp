@@ -4,13 +4,12 @@
 
 namespace gsblox {
 
-class TumRgbDReader final : public RgbDReader {
+class TumRgbDReader final : public Reader {
 public:
-    explicit TumRgbDReader(const ReaderConfig& config, float max_timestamp_difference = 0.02f);
+    explicit TumRgbDReader(const ReaderConfig& config, double max_timestamp_difference = DEFAULT_MAX_TIMESTAMP_DIFFERENCE);
 
-    static std::unique_ptr<TumRgbDReader> create(const std::filesystem::path& yaml_file) {
-        return std::make_unique<TumRgbDReader>(ReaderConfig::from_yaml(yaml_file));
-    }
+    static std::unique_ptr<TumRgbDReader> create(const std::filesystem::path& yaml_file);
+    static constexpr auto DEFAULT_MAX_TIMESTAMP_DIFFERENCE = 0.02;
 
 private:
     ReadStatus read_color(nvblox::ColorImage*  color) override;

@@ -1,0 +1,31 @@
+# TUM-RGBD dataset
+---
+sensors:
+  - id:     0
+    type:   pinhole
+    width:  640
+    height: 480
+    fx:     517.3
+    fy:     516.5
+    cx:     318.6
+    cy:     255.3
+
+reader:
+  # Common reader config
+  reader_type: tum_rgbd
+  scene_dir:   ~/datasets/tum-rgbd/rgbd_dataset_freiburg3_long_office_household
+  depth_scale: 5000
+  fps:         0.0
+  drop_frames: false
+  is_live:     false
+  # TUM-RGBD specifics
+  max_timestamp_difference: 0.08
+
+fuser:
+  mapping_type: tsdf_static
+  esdf_mode:    3D
+  voxel_size:   0.01
+  max_integration_distance: 5.0
+  color_frame_subsampling:  20
+
+output_dir: "output/tum_rgbd/fr3_office"

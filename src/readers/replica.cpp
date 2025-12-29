@@ -5,7 +5,7 @@
 #include "gsblox/utils/image.hpp"
 
 gsblox::ReplicaReader::ReplicaReader(const ReaderConfig& config)
-    : RgbDReader{ config }
+    : Reader{ config }
     , _traj_file{ std::ifstream{ config.scene_dir / "traj.txt" } }
 {
     if (!_traj_file.is_open()) {

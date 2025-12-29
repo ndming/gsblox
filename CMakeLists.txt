@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 3.22...3.31)
 message(STATUS "Configuring with CMake ${CMAKE_VERSION}")
 
+if(POLICY CMP0146)
+    # CMake 3.27+ removes the legacy FindCUDA.cmake module. Some third-party packages
+    # (including older OpenCV builds) still call: find_package(CUDA). Without FindCUDA,
+    # this call becomes a hard error in newer CMake versions. Setting CMP0146 to OLD
+    # temporarily re-enables the legacy behavior so that those packages continue to
+    # configure successfully.
+    cmake_policy(SET CMP0146 OLD)
+endif()
+
 # Default build type to Release
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose build variant, options are: Debug or Release" FORCE)
@@ -75,9 +84,11 @@ add_executable(gsblox
         src/readers/replica.cpp
         src/readers/tum_rgbd.cpp
         src/utils/image.cpp
+        src/utils/io.cpp
         src/utils/path.cpp
-        src/utils/sensor.cpp
         src/main.cpp
+        src/reader.cpp
+        src/sensor.cpp
 )
 # Treat all warnings as error
 set_target_properties(gsblox PROPERTIES COMPILE_WARNING_AS_ERROR ON)

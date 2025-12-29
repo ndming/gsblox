@@ -2,13 +2,14 @@
 #include "gsblox/utils/image.hpp"
 
 #include <spdlog/spdlog.h>
+#include <yaml-cpp/yaml.h>
 
 #include <fstream>
 
 /// Reads rgb.txt or depth.txt and returns a vector of timestamp-path
-std::vector<std::pair<float, std::string>> read_list_file(const std::filesystem::path& file) {
+std::vector<std::pair<double, std::string>> read_list_file(const std::filesystem::path& file) {
     // TODO: consume the file and count how many lines upfront to allocate the vector
-    auto images = std::vector<std::pair<float, std::string>>{};
+    auto images = std::vector<std::pair<double, std::string>>{};
     auto txt_file = std::ifstream{ file };
 
     if (!txt_file.is_open()) [[unlikely]] {
@@ -22,7 +23,7 @@ std::vector<std::pair<float, std::string>> read_list_file(const std::filesystem:
             continue;
         }
         auto iss = std::istringstream{ line };
-        auto t = 0.0f;
+        auto t = 0.0;
         auto p = std::string{};
         iss >> t >> p;
         images.emplace_back(t, p);
@@ -32,7 +33,7 @@ std::vector<std::pair<float, std::string>> read_list_file(const std::filesystem:
 }
 
 struct Pose {
-    float timestamp{ 0.0f };
+    double timestamp{ 0.0f };
     Eigen::Vector3f t{};
     Eigen::Quaternionf q{};
 };
@@ -66,7 +67,7 @@ std::vector<Pose> read_pose_file(const std::filesystem::path& file) {
     return poses;
 }
 
-std::pair<Pose, Pose> find_surrounding_poses(const std::vector<Pose>& poses, const float t) {
+std::pair<Pose, Pose> find_surrounding_poses(const std::vector<Pose>& poses, const double t) {
     // TODO: use binary search to reduce the query time
     for (auto i = 0u; i + 1 < poses.size(); ++i) {
         if (poses[i].timestamp == t) {
@@ -83,17 +84,17 @@ std::pair<Pose, Pose> find_surrounding_poses(const std::vector<Pose>& poses, con
 }
 
 std::vector<int> find_associated_indices(
-    const std::vector<std::pair<float, std::string>>& depth_images,
-    const std::vector<std::pair<float, std::string>>& color_images,
-    const float max_timestamp_difference)
+    const std::vector<std::pair<double, std::string>>& depth_images,
+    const std::vector<std::pair<double, std::string>>& color_images,
+    const double max_timestamp_difference)
 {
     auto indices = std::vector(depth_images.size(), -1);
     auto used = std::vector(color_images.size(), false);
 
     for (uint32_t i = 0; i < depth_images.size(); ++i) {
-        float best = max_timestamp_difference;
-        int best_j = -1;
-        for (int j = 0; j < static_cast<int>(color_images.size()); ++j) {
+        double best = max_timestamp_difference;
+        auto best_j = -1;
+        for (auto j = 0; j < static_cast<int>(color_images.size()); ++j) {
             if (const auto dt = std::fabs(depth_images[i].first - color_images[j].first);
                 dt < best && !used[j]) {
                 best = dt;
@@ -115,8 +116,8 @@ std::vector<int> find_associated_indices(
 
 gsblox::TumRgbDReader::TumRgbDReader(
     const ReaderConfig& config,
-    const float max_timestamp_difference)
-    : RgbDReader{ config }
+    const double max_timestamp_difference)
+    : Reader{ config }
 {
     // The main driving forces are depth and poses: rgb images selected based on their timestamps
     auto depth_images = read_list_file(config.scene_dir / "depth.txt");
@@ -142,16 +143,21 @@ gsblox::TumRgbDReader::TumRgbDReader(
     for (auto i = 0u; i < depth_images.size(); ++i) {
         const auto depth_timestamp = depth_images[i].first;
         const auto [p0, p1] = find_surrounding_poses(poses, depth_timestamp);
-        if (p0.timestamp == 0.0f && p1.timestamp == 0.0f) {
+        if (p0.timestamp == 0.0 && p1.timestamp == 0.0) {
             spdlog::warn("Could NOT find surrounding poses for depth image at timestamp: {}, discarding it", depth_timestamp);
             continue;
         }
 
-        // Interpolate poses surrounding the depth image's timestamp
-        const auto dt = p1.timestamp - p0.timestamp;
-        const auto alpha = (depth_timestamp - p0.timestamp) / dt;
-        auto pose_t = (1.f - alpha) * p0.t + alpha * p1.t;
-        auto pose_q = p0.q.slerp(alpha, p1.q);
+        auto pose_t = p0.t;
+        auto pose_q = p0.q;
+
+        // Interpolate poses surrounding the depth image's timestamp,
+        // only do this if the 2 timestamps are different
+        if (const auto dt = p1.timestamp - p0.timestamp; dt > 0.0) {
+            const auto alpha = (depth_timestamp - p0.timestamp) / dt;
+            pose_t = (1.f - alpha) * p0.t + alpha * p1.t;
+            pose_q = p0.q.slerp(static_cast<float>(alpha), p1.q);
+        }
         Eigen::Matrix4f T = Eigen::Matrix4f::Identity();
         T.block<3,3>(0,0) = pose_q.toRotationMatrix();
         T.block<3,1>(0,3) = pose_t;
@@ -187,6 +193,36 @@ gsblox::TumRgbDReader::TumRgbDReader(
     }
 
     _num_frames = _frames.size();
+}
+
+std::unique_ptr<gsblox::TumRgbDReader> gsblox::TumRgbDReader::create(const std::filesystem::path& yaml_file) {
+    const auto config = ReaderConfig::from_yaml(yaml_file);
+    auto max_timestamp_difference = DEFAULT_MAX_TIMESTAMP_DIFFERENCE;
+
+    auto root = YAML::Node{};
+    try {
+        root = YAML::LoadFile(yaml_file.string());
+    } catch (const YAML::ParserException& _) {
+        // Use the default max_timestamp_difference
+        return std::make_unique<TumRgbDReader>(config, max_timestamp_difference);
+    }
+
+    const auto reader_node = root["reader"];
+    if (!reader_node || !reader_node.IsMap()) [[unlikely]] {
+        // Use the default max_timestamp_difference
+        return std::make_unique<TumRgbDReader>(config, max_timestamp_difference);
+    }
+
+    try {
+        // Read max_timestamp_difference from config file if it presents
+        max_timestamp_difference = reader_node["max_timestamp_difference"].as<double>();
+    } catch (const YAML::Exception& _) {
+        // Use the default max_timestamp_difference
+        return std::make_unique<TumRgbDReader>(config, max_timestamp_difference);
+    }
+
+    // Use max_timestamp_difference in the config file
+    return std::make_unique<TumRgbDReader>(config, max_timestamp_difference);
 }
 
 gsblox::Reader::ReadStatus gsblox::TumRgbDReader::read_color(nvblox::ColorImage* color) {

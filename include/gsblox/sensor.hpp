@@ -15,9 +15,9 @@ struct Sensor {
     float cy;
 };
 
-namespace utils {
+namespace sensor {
 
-[[nodiscard]] std::vector<Sensor> read_sensors(const std::filesystem::path& yaml_file);
+[[nodiscard]] std::vector<Sensor> read(const std::filesystem::path& config_file);
 
-} // namespace utils
+} // namespace sensor
 } // namespace gsblox

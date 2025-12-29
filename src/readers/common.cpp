@@ -6,7 +6,7 @@
 
 #include <chrono>
 
-bool cmp_str_key(const std::string_view str, const std::string_view key) {
+bool cmp_str_key(const std::string_view str, const std::string_view key) noexcept {
     if (str.size() != key.size()) {
         return false;
     }
@@ -18,23 +18,38 @@ bool cmp_str_key(const std::string_view str, const std::string_view key) {
     return true;
 }
 
-gsblox::ReaderType gsblox::get_reader_type(const std::string_view str) {
-    if (cmp_str_key(str, "replica")) {
+gsblox::ReaderType gsblox::utils::get_reader_type(const std::string_view key) noexcept {
+    if (cmp_str_key(key, "replica")) {
         return ReaderType::Replica;
     }
-    if (cmp_str_key(str, "tum_rgb")) {
+    if (cmp_str_key(key, "tum_rgbd")) {
         return ReaderType::TumRgbD;
     }
-    spdlog::warn("Encountered unknown reader type: {}", str);
     return ReaderType::Unknown;
 }
 
-std::string gsblox::to_string(const ReaderType reader) {
-    switch (reader) {
+std::string gsblox::utils::to_string(const ReaderType type) noexcept {
+    switch (type) {
         case ReaderType::Replica: return "replica";
-        case ReaderType::TumRgbD: return "tum_rgb";
+        case ReaderType::TumRgbD: return "tum_rgbd";
         default: return "unknown";
     }
+}
+
+bool gsblox::ReaderConfig::valid() const {
+    if (!std::filesystem::exists(scene_dir)) {
+        spdlog::warn("Invalid ReaderConfig: non-existing scene_dir path: {}", scene_dir.string());
+        return false;
+    }
+    if (reader_type == ReaderType::Unknown) {
+        spdlog::warn("Invalid ReaderConfig: unknown reader_type");
+        return false;
+    }
+    if (std::isnan(depth_multiplier)) {
+        spdlog::warn("Invalid ReaderConfig: depth_multiplier is NaN");
+        return false;
+    }
+    return true;
 }
 
 template <typename T>
@@ -57,13 +72,13 @@ gsblox::ReaderConfig gsblox::ReaderConfig::from_yaml(const std::filesystem::path
     try {
         root = YAML::LoadFile(file.string());
     } catch (const YAML::ParserException& e) {
-        spdlog::error("Could NOT parse YAML file at: {}, due to: {}", file.string(), e.what());
+        spdlog::error("Could NOT load YAML file at: {}, due to: {}", file.string(), e.what());
         return {};
     }
 
     const auto reader_node = root["reader"];
     if (!reader_node || !reader_node.IsMap()) [[unlikely]] {
-        spdlog::error("Could NOT find reader section in: {}", file.string());
+        spdlog::error("Could NOT find reader node in: {}", file.string());
         return {};
     }
 
@@ -73,7 +88,7 @@ gsblox::ReaderConfig gsblox::ReaderConfig::from_yaml(const std::filesystem::path
     // Get reader type
     auto reader_type_str = std::string{};
     read_yaml_node(reader_node, "reader_type", &reader_type_str);
-    config.type = get_reader_type(reader_type_str);
+    config.reader_type = utils::get_reader_type(reader_type_str);
 
     // Get scene dir
     auto scene_dir_str = std::string{};
@@ -93,22 +108,15 @@ gsblox::ReaderConfig gsblox::ReaderConfig::from_yaml(const std::filesystem::path
     return config;
 }
 
-gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::ColorImage* color, uint32_t* sensor_id) {
-    const auto status = read_color(color) + get_sensor(sensor_id);
-    wait_then_increment(status);
-    return status;
-}
-
-gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::Transform* c2w, uint32_t* sensor_id) {
-    const auto status = read_c2w_color(c2w) + get_sensor(sensor_id);
-    wait_then_increment(status);
-    return status;
-}
-
-gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::ColorImage* color, nvblox::Transform* c2w, uint32_t* sensor_id) {
-    const auto status = read_color(color) + read_c2w_color(c2w) + get_sensor(sensor_id);
-    wait_then_increment(status);
-    return status;
+gsblox::Reader::Reader(ReaderConfig config)
+    : _config{ std::move(config) }
+    , _num_frames{ 0 }
+    , _curr_frame{ 0 }
+    , _last_frame_time{ std::chrono::steady_clock::now() }
+{
+    if (!_config.valid()) {
+        spdlog::error("Received invalid reader config");
+    }
 }
 
 void gsblox::Reader::wait_then_increment(const ReadStatus status) {
@@ -139,43 +147,88 @@ void gsblox::Reader::wait_then_increment(const ReadStatus status) {
     _last_frame_time = steady_clock::now();
 }
 
-gsblox::Reader::ReadStatus gsblox::RgbDReader::next(nvblox::DepthImage* depth, uint32_t* sensor_id) {
-    const auto status = read_depth(depth) + get_sensor(sensor_id);
+gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::ColorImage* color, uint32_t* sensor_id) {
+    const auto status = read_color(color) + read_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }
 
-gsblox::Reader::ReadStatus gsblox::RgbDReader::next(nvblox::Transform* c2w_color, nvblox::Transform* c2w_depth, uint32_t* sensor_id) {
-    const auto status = read_c2w_color(c2w_color) + read_c2w_depth(c2w_depth) + get_sensor(sensor_id);
+gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::Transform* c2w, uint32_t* sensor_id) {
+    const auto status = read_c2w_color(c2w) + read_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }
 
-gsblox::Reader::ReadStatus gsblox::RgbDReader::next(nvblox::ColorImage* color, nvblox::DepthImage* depth, uint32_t* sensor_id) {
-    const auto status = read_color(color) + read_depth(depth) + get_sensor(sensor_id);
+gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::ColorImage* color, nvblox::Transform* c2w, uint32_t* sensor_id) {
+    const auto status = read_color(color) + read_c2w_color(c2w) + read_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }
 
-gsblox::Reader::ReadStatus gsblox::RgbDReader::next(
+gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::DepthImage* depth, uint32_t* sensor_id) {
+    const auto status = read_depth(depth) + read_sensor(sensor_id);
+    wait_then_increment(status);
+    return status;
+}
+
+gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::Transform* c2w_color, nvblox::Transform* c2w_depth, uint32_t* sensor_id) {
+    const auto status = read_c2w_color(c2w_color) + read_c2w_depth(c2w_depth) + read_sensor(sensor_id);
+    wait_then_increment(status);
+    return status;
+}
+
+gsblox::Reader::ReadStatus gsblox::Reader::next(nvblox::ColorImage* color, nvblox::DepthImage* depth, uint32_t* sensor_id) {
+    const auto status = read_color(color) + read_depth(depth) + read_sensor(sensor_id);
+    wait_then_increment(status);
+    return status;
+}
+
+gsblox::Reader::ReadStatus gsblox::Reader::next(
     nvblox::ColorImage* color,
     nvblox::DepthImage* depth,
     nvblox::Transform* c2w,
     uint32_t* sensor_id)
 {
-    const auto status = read_color(color) + read_depth(depth) + read_c2w_color(c2w) + get_sensor(sensor_id);
+    const auto status = read_color(color) + read_depth(depth) + read_c2w_color(c2w) + read_sensor(sensor_id);
     wait_then_increment(status);
     return status;
 }
 
-gsblox::Reader::ReadStatus gsblox::RgbDReader::next(
+gsblox::Reader::ReadStatus gsblox::Reader::next(
     nvblox::ColorImage* color, nvblox::Transform* c2w_color,
     nvblox::DepthImage* depth, nvblox::Transform* c2w_depth,
     uint32_t* sensor_id)
 {
     const auto status = read_color(color) + read_c2w_color(c2w_color)
                       + read_depth(depth) + read_c2w_depth(c2w_depth)
-                      + get_sensor(sensor_id);
+                      + read_sensor(sensor_id);
     wait_then_increment(status);
     return status;
+}
+
+gsblox::Reader::ReadStatus gsblox::Reader::read_color(nvblox::ColorImage* color) {
+    spdlog::error("Failed to read color images: it's likely that the underlying dataset reader does not support this operation");
+    return ReadStatus::Failed;
+}
+
+gsblox::Reader::ReadStatus gsblox::Reader::read_depth(nvblox::DepthImage* depth) {
+    spdlog::error("Failed to read color images: it's likely that the underlying dataset reader does not support this operation");
+    return ReadStatus::Failed;
+}
+
+gsblox::Reader::ReadStatus gsblox::Reader::read_c2w_color(nvblox::Transform* c2w) {
+    // Default to identity (no transform from cam to world)
+    if (c2w) *c2w = nvblox::Transform::Identity();
+    return ReadStatus::Consumed;
+}
+
+gsblox::Reader::ReadStatus gsblox::Reader::read_c2w_depth(nvblox::Transform* c2w) {
+    // Steal the default behavior of c2w color
+    return read_c2w_color(c2w);
+}
+
+gsblox::Reader::ReadStatus gsblox::Reader::read_sensor(uint32_t* sensor_id) {
+    // Default to the first (and only) sensor
+    if (sensor_id) *sensor_id = 0;
+    return ReadStatus::Consumed;
 }

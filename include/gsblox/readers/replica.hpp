@@ -6,7 +6,7 @@
 
 namespace gsblox {
 
-class ReplicaReader final : public RgbDReader {
+class ReplicaReader final : public Reader {
 public:
     explicit ReplicaReader(const ReaderConfig& config);
 
@@ -14,7 +14,7 @@ public:
         return std::make_unique<ReplicaReader>(ReaderConfig::from_yaml(yaml_file));
     }
 
-    ~ReplicaReader() override { _traj_file.close(); }
+    ~ReplicaReader() noexcept override { _traj_file.close(); }
 
 private:
     ReadStatus read_color(nvblox::ColorImage*  color) override;
