@@ -85,8 +85,8 @@ add_executable(gsblox
         src/readers/tum_rgbd.cpp
         src/utils/config.cpp
         src/utils/image.cpp
-        src/utils/io.cpp
         src/utils/path.cpp
+        src/fuser.cpp
         src/main.cpp
         src/reader.cpp
         src/sensor.cpp

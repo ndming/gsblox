@@ -12,16 +12,18 @@ sensors:
 
 reader:
   reader_type: replica
-  scene_dir:   ~/datasets/replica/office0
+  scene_dir:   ~/datasets/replica/room2
   depth_scale: 6553.5
   fps:         0.0
   drop_frames: false
   is_live:     false
 
 fuser:
-  mapping_type: tsdf_static
-  esdf_mode:    3D
-  voxel_size:   0.02
-  color_frame_subsampling: 20
+  voxel_size:   0.02         # in meter
+  mapping_type: static_tsdf  # static_tsdf, static_occupancy, dynamic, human_static_tsdf, human_static_occupancy
+  esdf_mode:    3D           # 3D, 2D, unset
+  feat_frame_subsampling: 20
+  background:
+    max_integration_distance: 5 # in meter
 
-output_dir: "output/replica/office0"
+output_dir: "output/replica/room2"

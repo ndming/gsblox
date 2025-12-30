@@ -1,4 +1,5 @@
 #include "gsblox/sensor.hpp"
+#include "gsblox/utils/config.hpp"
 
 #include <spdlog/spdlog.h>
 #include <yaml-cpp/yaml.h>
@@ -19,13 +20,7 @@ bool read_yaml_node(const YAML::Node& node, const std::string_view key, T* out) 
 }
 
 std::vector<gsblox::Sensor> gsblox::sensor::read(const std::filesystem::path& config_file) {
-    auto root = YAML::Node{};
-    try {
-        root = YAML::LoadFile(config_file.string());
-    } catch (const YAML::ParserException& e) {
-        spdlog::error("Could NOT load YAML file at: {}, due to: {}", config_file.string(), e.what());
-        return {};
-    }
+    const auto root = utils::load_yaml(config_file);
 
     const auto sensor_list = root["sensors"];
     if (!sensor_list || !sensor_list.IsSequence()) [[unlikely]] {

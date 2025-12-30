@@ -28,15 +28,15 @@ std::string gsblox::utils::to_string(const ReaderType type) noexcept {
 
 bool gsblox::ReaderConfig::valid() const {
     if (!std::filesystem::exists(scene_dir)) {
-        spdlog::warn("Invalid ReaderConfig: non-existing scene_dir path: {}", scene_dir.string());
+        spdlog::warn("Invalid reader config: non-existing scene_dir path {}", scene_dir.string());
         return false;
     }
     if (reader_type == ReaderType::Unknown) {
-        spdlog::warn("Invalid ReaderConfig: unknown reader_type");
+        spdlog::warn("Invalid reader config: unknown reader_type");
         return false;
     }
     if (std::isnan(depth_multiplier)) {
-        spdlog::warn("Invalid ReaderConfig: depth_multiplier is NaN");
+        spdlog::warn("Invalid reader config: depth_multiplier is NaN");
         return false;
     }
     return true;
@@ -98,9 +98,6 @@ gsblox::Reader::Reader(ReaderConfig config)
     , _curr_frame{ 0 }
     , _last_frame_time{ std::chrono::steady_clock::now() }
 {
-    if (!_config.valid()) {
-        spdlog::error("Received invalid reader config");
-    }
 }
 
 void gsblox::Reader::wait_then_increment(const ReadStatus status) {

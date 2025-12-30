@@ -13,7 +13,7 @@ sensors:
 reader:
   # Common reader config
   reader_type: tum_rgbd
-  scene_dir:   ~/datasets/tum-rgbd/rgbd_dataset_freiburg3_long_office_household
+  scene_dir:   ~/datasets/tum-rgbd/rgbd_dataset_freiburg1_desk
   depth_scale: 5000
   fps:         0.0
   drop_frames: false
@@ -22,10 +22,11 @@ reader:
   max_timestamp_difference: 0.08
 
 fuser:
-  mapping_type: tsdf_static
-  esdf_mode:    3D
   voxel_size:   0.01
-  max_integration_distance: 5.0
-  color_frame_subsampling:  20
+  mapping_type: static_tsdf
+  esdf_mode:    3D
+  feat_frame_subsampling: 20
+  background:
+    max_integration_distance: 5.0
 
-output_dir: "output/tum_rgbd/fr3_office"
+output_dir: "output/tum_rgbd/fr1_desk"

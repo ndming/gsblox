@@ -2,16 +2,32 @@
 
 #include "gsblox/utils/config.hpp"
 #include "gsblox/utils/image.hpp"
-#include "gsblox/utils/io.hpp"
 
 #include <spdlog/spdlog.h>
 #include <yaml-cpp/yaml.h>
 
 #include <fstream>
 
+std::size_t peak_lines(const std::filesystem::path& file, const char ignore_symbol) {
+    auto fs = std::ifstream{ file };
+    if (!fs.is_open()) [[unlikely]] {
+        return 0;
+    }
+
+    std::size_t num_lines = 0;
+    std::string line;
+    while (std::getline(fs, line)) {
+        if (line.empty() || line[0] == ignore_symbol) {
+            continue;
+        }
+        ++num_lines;
+    }
+    return num_lines;
+}
+
 /// Reads rgb.txt or depth.txt and returns a vector of timestamp-path
 std::vector<std::pair<double, std::string>> read_list_file(const std::filesystem::path& file) {
-    const auto num_lines = gsblox::utils::peak_lines(file, '#');
+    const auto num_lines = peak_lines(file, '#');
     if (num_lines == 0) [[unlikely]] {
         return {};
     }
@@ -45,7 +61,7 @@ struct Pose {
 
 /// Reads groundtruth.txt and returns a vector of timestamp-pose
 std::vector<Pose> read_pose_file(const std::filesystem::path& file) {
-    const auto num_lines = gsblox::utils::peak_lines(file, '#');
+    const auto num_lines = peak_lines(file, '#');
     if (num_lines == 0) [[unlikely]] {
         return {};
     }

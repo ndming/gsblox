@@ -28,7 +28,8 @@ enum class MappingType {
   kStaticOccupancy,      /// only static occupancy
   kDynamic,              /// static tsdf (incl. freespace) and dynamic occupancy
   kHumanWithStaticTsdf,  /// static tsdf and human occupancy
-  kHumanWithStaticOccupancy  /// static occupancy and human occupancy
+  kHumanWithStaticOccupancy,  /// static occupancy and human occupancy
+  kUnset,
 };
 
 /// Whether the foreground mapper is used for human mapping

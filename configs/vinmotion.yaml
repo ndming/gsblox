@@ -19,10 +19,11 @@ reader:
   is_live:     false
 
 fuser:
-  mapping_type: tsdf_static
+  voxel_size:   0.02
+  mapping_type: static_tsdf
   esdf_mode:    3D
-  voxel_size:   0.01
-  max_integration_distance: 2.5
-  color_frame_subsampling: 20
+  feat_frame_subsampling: 20
+  background:
+    max_integration_distance: 2.5
 
 output_dir: output/vinmotion/hallway
