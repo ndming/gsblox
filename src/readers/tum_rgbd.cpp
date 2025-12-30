@@ -1,5 +1,8 @@
 #include "gsblox/readers/tum_rgbd.hpp"
+
+#include "gsblox/utils/config.hpp"
 #include "gsblox/utils/image.hpp"
+#include "gsblox/utils/io.hpp"
 
 #include <spdlog/spdlog.h>
 #include <yaml-cpp/yaml.h>
@@ -8,16 +11,18 @@
 
 /// Reads rgb.txt or depth.txt and returns a vector of timestamp-path
 std::vector<std::pair<double, std::string>> read_list_file(const std::filesystem::path& file) {
-    // TODO: consume the file and count how many lines upfront to allocate the vector
-    auto images = std::vector<std::pair<double, std::string>>{};
-    auto txt_file = std::ifstream{ file };
-
-    if (!txt_file.is_open()) [[unlikely]] {
-        spdlog::error("Could NOT open file: {}", file.string());
+    const auto num_lines = gsblox::utils::peak_lines(file, '#');
+    if (num_lines == 0) [[unlikely]] {
         return {};
     }
 
-    auto line = std::string{};
+    // Pre-allocate with peaked number of lines
+    auto images = std::vector<std::pair<double, std::string>>{};
+    images.reserve(num_lines);
+
+    // Consume lines
+    auto txt_file = std::ifstream{ file };
+    std::string line;
     while (std::getline(txt_file, line)) {
         if (line.empty() || line[0] == '#') {
             continue;
@@ -40,16 +45,18 @@ struct Pose {
 
 /// Reads groundtruth.txt and returns a vector of timestamp-pose
 std::vector<Pose> read_pose_file(const std::filesystem::path& file) {
-    // TODO: consume the file and count how many lines upfront to allocate the vector
-    auto poses = std::vector<Pose>{};
-    auto txt_file = std::ifstream{ file };
-
-    if (!txt_file.is_open()) [[unlikely]] {
-        spdlog::error("Could NOT open file: {}", file.string());
+    const auto num_lines = gsblox::utils::peak_lines(file, '#');
+    if (num_lines == 0) [[unlikely]] {
         return {};
     }
 
-    auto line = std::string{};
+    // Pre-allocate with peaked number of lines
+    auto poses = std::vector<Pose>{};
+    poses.reserve(num_lines);
+
+    // Consume poses
+    auto txt_file = std::ifstream{ file };
+    std::string line;
     while (std::getline(txt_file, line)) {
         if (line.empty() || line[0] == '#') {
             continue;
@@ -137,6 +144,11 @@ gsblox::TumRgbDReader::TumRgbDReader(
     }
 
     const auto poses = read_pose_file(pose_file);
+    if (poses.empty()) [[unlikely]] {
+        spdlog::error("Empty pose file: {}", pose_file.string());
+        return; // empty reader
+    }
+
     auto first_inv = Eigen::Matrix4f{};
     bool first = true;
 
@@ -199,13 +211,8 @@ std::unique_ptr<gsblox::TumRgbDReader> gsblox::TumRgbDReader::create(const std::
     const auto config = ReaderConfig::from_yaml(yaml_file);
     auto max_timestamp_difference = DEFAULT_MAX_TIMESTAMP_DIFFERENCE;
 
-    auto root = YAML::Node{};
-    try {
-        root = YAML::LoadFile(yaml_file.string());
-    } catch (const YAML::ParserException& _) {
-        // Use the default max_timestamp_difference
-        return std::make_unique<TumRgbDReader>(config, max_timestamp_difference);
-    }
+    // Find a few more params specific to TUM-RGBD
+    const auto root = utils::load_yaml(yaml_file);
 
     const auto reader_node = root["reader"];
     if (!reader_node || !reader_node.IsMap()) [[unlikely]] {

@@ -65,21 +65,20 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        multi_mapper->integrateDepth(*depth_image, c2w, camera);
-        multi_mapper->integrateColor(*color_image, c2w, camera);
-        multi_mapper->updateColorMesh();
-        multi_mapper->updateEsdf();
+        multi_mapper->integrateDepth(*depth_image, c2w, camera); // tsdf integrator
+        multi_mapper->integrateColor(*color_image, c2w, camera); // color integrator
+        multi_mapper->updateColorMesh(); // color mesh integrator
+        multi_mapper->updateEsdf(); // esdf integrator
 
         cv::Mat color(color_image->height(), color_image->width(),  CV_8UC3, color_image->dataPtr());
         cv::Mat depth(depth_image->height(), depth_image->width(), CV_32FC1, depth_image->dataPtr());
-
-        constexpr float max_depth = 5.0f; // meters
 
         // RGB -> BGR
         cv::Mat color_bgr;
         cv::cvtColor(color, color_bgr, cv::COLOR_RGB2BGR);
 
         // Clamp depth values
+        const auto max_depth = multi_mapper->background_mapper()->tsdf_integrator().max_integration_distance_m();
         cv::Mat depth_clamped;
         cv::min(depth, max_depth, depth_clamped);
 

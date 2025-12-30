@@ -1,22 +1,12 @@
 #include "gsblox/readers/common.hpp"
+
+#include "gsblox/utils/config.hpp"
 #include "gsblox/utils/path.hpp"
 
 #include <spdlog/spdlog.h>
 #include <yaml-cpp/yaml.h>
 
 #include <chrono>
-
-bool cmp_str_key(const std::string_view str, const std::string_view key) noexcept {
-    if (str.size() != key.size()) {
-        return false;
-    }
-    for (size_t i = 0; i < str.size(); ++i) {
-        if (std::tolower(static_cast<unsigned char>(str[i])) != std::tolower(static_cast<unsigned char>(key[i]))) {
-            return false;
-        }
-    }
-    return true;
-}
 
 gsblox::ReaderType gsblox::utils::get_reader_type(const std::string_view key) noexcept {
     if (cmp_str_key(key, "replica")) {
@@ -68,13 +58,7 @@ bool read_yaml_node(const YAML::Node& node, const std::string_view key, T* out) 
 }
 
 gsblox::ReaderConfig gsblox::ReaderConfig::from_yaml(const std::filesystem::path& file) {
-    auto root = YAML::Node{};
-    try {
-        root = YAML::LoadFile(file.string());
-    } catch (const YAML::ParserException& e) {
-        spdlog::error("Could NOT load YAML file at: {}, due to: {}", file.string(), e.what());
-        return {};
-    }
+    const auto root = utils::load_yaml(file);
 
     const auto reader_node = root["reader"];
     if (!reader_node || !reader_node.IsMap()) [[unlikely]] {

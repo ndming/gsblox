@@ -83,6 +83,7 @@ add_executable(gsblox
         src/readers/common.cpp
         src/readers/replica.cpp
         src/readers/tum_rgbd.cpp
+        src/utils/config.cpp
         src/utils/image.cpp
         src/utils/io.cpp
         src/utils/path.cpp

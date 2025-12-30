@@ -5,9 +5,12 @@
 #include <spdlog/spdlog.h>
 #include <yaml-cpp/yaml.h>
 
+#include <fstream>
+
 std::filesystem::path prepare_default_output_dir() {
     constexpr auto output_path = "output";
-    const auto output_dir = gsblox::utils::make_norm(output_path);
+    auto output_dir = gsblox::utils::make_norm(output_path);
+    spdlog::info("Creating default output directory at: {}", output_dir.string());
 
     auto ec = std::error_code{};
     if (std::filesystem::create_directory(output_dir, ec) || !ec) [[likely]] {
@@ -18,6 +21,8 @@ std::filesystem::path prepare_default_output_dir() {
 }
 
 std::filesystem::path gsblox::utils::prepare_out_dir(const std::filesystem::path& config_file) {
+    // Find output_dir node in the config file. If successful, create a directory there,
+    // otherwise, create a default output directory prepare_default_output_dir
     auto root = YAML::Node{};
     try {
         root = YAML::LoadFile(config_file.string());
@@ -34,7 +39,7 @@ std::filesystem::path gsblox::utils::prepare_out_dir(const std::filesystem::path
 
     try {
         const auto output_path = output_node.as<std::string>();
-        const auto output_dir  = make_norm(output_path);
+        auto output_dir = make_norm(output_path);
 
         auto ec = std::error_code{};
         if (std::filesystem::create_directories(output_dir, ec) || !ec) [[likely]] {
@@ -56,4 +61,21 @@ void gsblox::utils::prepare_log_dir(const char* program, const std::filesystem::
     const auto log_dir = output_dir / "log";
     std::filesystem::create_directory(log_dir);
     FLAGS_log_dir = log_dir.string();
+}
+
+std::size_t gsblox::utils::peak_lines(const std::filesystem::path& file, const char ignore_symbol) {
+    auto fs = std::ifstream{ file };
+    if (!fs.is_open()) [[unlikely]] {
+        return 0;
+    }
+
+    std::size_t num_lines = 0;
+    std::string line;
+    while (std::getline(fs, line)) {
+        if (line.empty() || line[0] == ignore_symbol) {
+            continue;
+        }
+        ++num_lines;
+    }
+    return num_lines;
 }

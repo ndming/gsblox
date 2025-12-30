@@ -1,8 +1,7 @@
 #include "gsblox/readers/replica.hpp"
+#include "gsblox/utils/image.hpp"
 
 #include <spdlog/spdlog.h>
-
-#include "gsblox/utils/image.hpp"
 
 gsblox::ReplicaReader::ReplicaReader(const ReaderConfig& config)
     : Reader{ config }
