@@ -1,3 +1,6 @@
+# sqlite3 v3.24
+add_subdirectory(sqlite3)
+
 # nvblox v0.0.8
 set(BUILD_PYTORCH_WRAPPER OFF)
 set(BUILD_TESTING         OFF)
