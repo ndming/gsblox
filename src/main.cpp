@@ -17,8 +17,8 @@
 void prepare_log_dir(const char* program, const std::filesystem::path& output_dir);
 
 constexpr auto FOCAL_LENGTH = 420;
-constexpr auto VIEWER_WIDTH = 640;
-constexpr auto VIEWER_HEIGHT = 480;
+constexpr auto VIEWER_WIDTH = 1280;
+constexpr auto VIEWER_HEIGHT = 720;
 
 constexpr auto UI_WIDTH = 180;
 

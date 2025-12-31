@@ -22,7 +22,6 @@ fuser:
   voxel_size:   0.02
   mapping_type: static_tsdf
   esdf_mode:    3D
-  feat_frame_subsampling: 20
   background:
     max_integration_distance: 2.5
 
