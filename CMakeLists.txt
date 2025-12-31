@@ -90,6 +90,7 @@ add_executable(gsblox
         src/main.cpp
         src/reader.cpp
         src/sensor.cpp
+        src/viewer.cpp
 )
 # Treat all warnings as error
 set_target_properties(gsblox PROPERTIES COMPILE_WARNING_AS_ERROR ON)
