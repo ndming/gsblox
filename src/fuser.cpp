@@ -75,13 +75,32 @@ void gsblox::Fuser::update_esdf() {
     }
 }
 
-void gsblox::Fuser::save_background_mesh(const std::filesystem::path& mesh_file) const {
+std::shared_ptr<nvblox::ColorMesh> gsblox::Fuser::get_background_color_mesh(const nvblox::CudaStream& stream) const {
+    return _mapper.background_mapper().color_mesh_layer().getMesh(stream);
+}
+
+void gsblox::Fuser::get_background_color_mesh(int* n_vertices, int* n_indices) const {
+    if (!n_vertices || !n_indices) {
+        spdlog::warn("Querying number of color mesh's vertices / triangles with null pointers, doing nothing");
+        return;
+    }
+    _mapper.background_mapper().color_mesh_layer().getMesh(n_vertices, n_indices);
+}
+
+void gsblox::Fuser::get_background_color_mesh(
+    Eigen::Vector3f* vbo, int* ibo, Eigen::Vector3f* nbo, nvblox::Color* cbo,
+    const nvblox::CudaStream& cuda_stream) const
+{
+    _mapper.background_mapper().color_mesh_layer().getMesh(vbo, ibo, nbo, cbo, cuda_stream);
+}
+
+void gsblox::Fuser::save_background_color_mesh(const std::filesystem::path& mesh_file) const {
     if (!_mapper.background_mapper().saveColorMeshAsPly(mesh_file.string())) {
         spdlog::error("Failed to save background color mesh: {}", mesh_file.string());
     }
 }
 
-void gsblox::Fuser::save_foreground_mesh(const std::filesystem::path& mesh_file) const {
+void gsblox::Fuser::save_foreground_color_mesh(const std::filesystem::path& mesh_file) const {
     if (!_mapper.foreground_mapper().saveColorMeshAsPly(mesh_file.string())) {
         spdlog::error("Failed to save foreground color mesh: {}", mesh_file.string());
     }
@@ -205,17 +224,17 @@ std::unique_ptr<gsblox::Fuser> gsblox::fuser::create(const std::filesystem::path
     auto fuser = std::make_unique<Fuser>(config);
 
     // Set subsampling rates, if any found
-    uint32_t subsampling;
-    if (read_yaml_node(fuser_node, "projective_subsampling", &subsampling) && subsampling > 0) {
+    if (uint32_t subsampling = 1; read_yaml_node(fuser_node, "projective_subsampling", &subsampling) && subsampling > 0) {
         fuser->set_projective_subsampling(subsampling);
     } else if (subsampling == 0) {
         spdlog::warn("Invalid fuser config: projective_subsampling must be non-zero, overriding with 1");
     }
-    if (read_yaml_node(fuser_node, "feat_frame_subsampling", &subsampling) && subsampling > 0) {
+    if (uint32_t subsampling = 1; read_yaml_node(fuser_node, "feat_frame_subsampling", &subsampling) && subsampling > 0) {
         fuser->set_feat_frame_subsampling(subsampling);
     } else if (subsampling == 0) {
         spdlog::warn("Invalid fuser config: feat_frame_subsampling must be non-zero, overriding with 1");
     }
+    uint32_t subsampling;
     if (read_yaml_node(fuser_node, "mesh_frame_subsampling", &subsampling)) {
         fuser->set_mesh_frame_subsampling(subsampling);
     }

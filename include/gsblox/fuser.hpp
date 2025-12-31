@@ -33,8 +33,14 @@ public:
     void update_mesh();
     void update_esdf();
 
-    void save_background_mesh(const std::filesystem::path& mesh_file) const;
-    void save_foreground_mesh(const std::filesystem::path& mesh_file) const;
+    std::shared_ptr<nvblox::ColorMesh> get_background_color_mesh(const nvblox::CudaStream& stream) const;
+    void get_background_color_mesh(int* n_vertices, int* n_indices) const;
+    void get_background_color_mesh(
+        Eigen::Vector3f* vbo, int* ibo, Eigen::Vector3f* nbo, nvblox::Color* cbo,
+        const nvblox::CudaStream& cuda_stream) const;
+
+    void save_background_color_mesh(const std::filesystem::path& mesh_file) const;
+    void save_foreground_color_mesh(const std::filesystem::path& mesh_file) const;
 
     [[nodiscard]] uint32_t get_projective_subsampling() const noexcept { return _projective_subsampling; }
     [[nodiscard]] uint32_t get_feat_frame_subsampling() const noexcept { return _feat_frame_subsampling; }

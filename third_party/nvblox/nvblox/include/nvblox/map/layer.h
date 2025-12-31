@@ -349,6 +349,9 @@ class MeshBlockLayer : public BlockLayer<MeshBlock<_AppearanceType>> {
   /// @return A shared pointer to the mesh.
   const std::shared_ptr<MeshType> getMesh(const CudaStream& cuda_stream) const;
 
+  void getMesh(int* n_vertices, int* n_triangles) const;
+  void getMesh(Vector3f* vbo, int* ibo, Vector3f* nbo, AppearanceType* abo, const CudaStream& cuda_stream) const;
+
  private:
   /// The monolithic mesh constructed from all the MeshBlocks in the layer.
   std::shared_ptr<MeshType> mesh_;

@@ -9,3 +9,8 @@ add_subdirectory(nvblox)
 
 # gsplat v1.5.3
 add_subdirectory(gsplat)
+
+# pangolin v0.9.4
+set(BUILD_TOOLS    OFF)
+set(BUILD_EXAMPLES OFF)
+add_subdirectory(pangolin)

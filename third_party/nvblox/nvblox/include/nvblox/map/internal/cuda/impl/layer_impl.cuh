@@ -183,4 +183,75 @@ MeshBlockLayer<AppearanceType>::getMesh(const CudaStream& cuda_stream) const {
   return mesh_;
 }
 
+template<typename AppearanceType>
+void MeshBlockLayer<AppearanceType>::getMesh(int* n_vertices, int* n_triangles) const {
+    if (!n_vertices || !n_triangles) {
+        return;
+    }
+
+    // Count total vertices and triangles across all blocks
+    int total_num_vertices = 0;
+    int total_num_triangles = 0;
+
+    const auto block_indices = this->getAllBlockIndices();
+    for (const auto& index : block_indices) {
+        typename MeshBlockType::ConstPtr block = this->getBlockAtIndex(index);
+        total_num_vertices += block->vertices.size();
+        total_num_triangles += block->triangles.size();
+    }
+    *n_vertices = total_num_vertices;
+    *n_triangles = total_num_triangles;
+}
+
+template<typename AppearanceType>
+void MeshBlockLayer<AppearanceType>::getMesh(
+    Vector3f* vbo,
+    int* ibo,
+    Vector3f* nbo,
+    AppearanceType* abo,
+    const CudaStream& cuda_stream) const
+{
+    // Keep track of the indices.
+    int next_vertex_index = 0;
+    int next_triangle_index = 0;
+
+    const auto block_indices = this->getAllBlockIndices();
+    for (const auto& index : block_indices) {
+        typename MeshBlockType::ConstPtr block = this->getBlockAtIndex(index);
+
+        // Check that the mesh block has:
+        // - per vertex appearances
+        // - per vertex vertex_normals
+        const auto num_vertices_in_block = block->vertices.size();
+        const auto num_triangles_in_block = block->triangles.size();
+
+        if (vbo) {
+            block->vertices.copyToAsync(vbo + next_vertex_index, cuda_stream);
+        }
+
+        if (nbo) {
+            CHECK((num_vertices_in_block == block->vertex_normals.size()) || (block->vertex_normals.size() == 0));
+            block->vertex_normals.copyToAsync(nbo + next_vertex_index, cuda_stream);
+        }
+
+        if (abo) {
+            CHECK((num_vertices_in_block == block->vertex_appearances.size()) || (block->vertex_appearances.size() == 0));
+            block->vertex_appearances.copyToAsync(abo + next_vertex_index, cuda_stream);
+        }
+
+        if (ibo) {
+            auto block_triangles_thrust = thrust::device_ptr<const int>(block->triangles.data());
+            const auto ibo_triangles_thrust = thrust::device_ptr<int>(ibo + next_triangle_index);
+            thrust::transform(
+                thrust::device.on(cuda_stream),
+                block_triangles_thrust, block_triangles_thrust + num_triangles_in_block,
+                ibo_triangles_thrust,
+                add_constant_functor(next_vertex_index));
+        }
+
+        // Increment the indices
+        next_vertex_index += num_vertices_in_block;
+        next_triangle_index += num_triangles_in_block;
+    }
+}
 }  // namespace nvblox

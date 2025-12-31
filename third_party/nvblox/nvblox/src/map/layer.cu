@@ -39,4 +39,12 @@ template const std::shared_ptr<ColorMesh> MeshBlockLayer<Color>::getMesh(
 template const std::shared_ptr<FeatureMesh>
 MeshBlockLayer<FeatureArray>::getMesh(const CudaStream& cuda_stream) const;
 
+template void MeshBlockLayer<Color>::getMesh(int* n_vertices, int* n_triangles) const;
+
+template void MeshBlockLayer<FeatureArray>::getMesh(int* n_vertices, int* n_triangles) const;
+
+template void MeshBlockLayer<Color>::getMesh(Vector3f* vbo, int* ibo, Vector3f* nbo, Color* cbo, const CudaStream& cuda_stream) const;
+
+template void MeshBlockLayer<FeatureArray>::getMesh(Vector3f* vbo, int* ibo, Vector3f* nbo, FeatureArray* fbo, const CudaStream& cuda_stream) const;
+
 }  // namespace nvblox

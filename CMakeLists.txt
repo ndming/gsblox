@@ -102,11 +102,19 @@ target_compile_options(gsblox PRIVATE
         $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Release>>:-O3 -use_fast_math>
 )
 
+# We use headers from pango_core that trigger parenthesis warnings, suppress them publicly
+target_compile_options(pango_core PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-parentheses>)
+
 target_link_libraries(gsblox PRIVATE
         nvblox_lib
         opencv_core
         opencv_imgcodecs
         opencv_highgui
+        pango_core
+        pango_display
+        pango_opengl
+        pango_plot
+        pango_video
         spdlog::spdlog_header_only
         yaml-cpp
 )
