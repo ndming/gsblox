@@ -189,19 +189,44 @@ bool read_yaml_node(const YAML::Node& node, const std::string_view key, T* out) 
 }
 
 std::unique_ptr<gsblox::Viewer> gsblox::viewer::create(const std::filesystem::path& config_file) {
-    // const auto root = utils::load_yaml(config_file);
-    // if (!root) {
-    //     spdlog::error("Could NOT create Viewer: empty YAML root");
-    //     return nullptr;
-    // }
-    //
-    // // Default viewer config
-    // auto viewer_config = ViewerConfig{};
-    //
-    // const auto viewer_node = root["viewer"];
-    // if (!viewer_node) {
-    //     // No viewer setting found, use default
-    //     return std::make_unique<Viewer>(viewer_config);
-    // }
-    return std::make_unique<Viewer>(ViewerConfig{});
+    const auto root = utils::load_yaml(config_file);
+    if (!root) {
+        spdlog::error("Could NOT create Viewer: empty YAML root");
+        return nullptr;
+    }
+
+    // Default viewer config
+    auto viewer_config = ViewerConfig{};
+
+    if (const auto viewer_node = root["viewer"]; viewer_node && viewer_node.IsMap()) [[unlikely]] {
+        // Modify the default settings if we detect any matched key
+        int val;
+        if (read_yaml_node(viewer_node, "width", &val) && val > 0) {
+            viewer_config.width = val;
+        }
+        if (read_yaml_node(viewer_node, "height", &val) && val > 0) {
+            viewer_config.height = val;
+        }
+        if (read_yaml_node(viewer_node, "cam_focal_length_u", &val) && val > 0) {
+            viewer_config.cam_focal_length_u = val;
+        }
+        if (read_yaml_node(viewer_node, "cam_focal_length_v", &val) && val > 0) {
+            viewer_config.cam_focal_length_v = val;
+        }
+        if (read_yaml_node(viewer_node, "ui_width", &val) && val > 0) {
+            viewer_config.ui_width = val;
+        }
+        if (read_yaml_node(viewer_node, "init_vertex_buffer_capacity", &val) && val > 0) {
+            viewer_config.init_vertex_buffer_capacity = val;
+        }
+        if (read_yaml_node(viewer_node, "init_index_buffer_capacity", &val) && val > 0) {
+            viewer_config.init_index_buffer_capacity = val;
+        }
+        std::string window_title;
+        if (read_yaml_node(viewer_node, "window_title", &window_title) && val > 0) {
+            viewer_config.window_title = std::move(window_title);
+        }
+    }
+
+    return std::make_unique<Viewer>(viewer_config);
 }
