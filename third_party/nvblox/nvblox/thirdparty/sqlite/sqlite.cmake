@@ -8,7 +8,8 @@ else()
     OVERRIDE_FIND_PACKAGE
     SYSTEM
     URL https://github.com/alex85k/sqlite3-cmake/archive/refs/tags/v3.24.0.tar.gz
-    URL_HASH MD5=15ab81bf8cfbdb9a9a3b3abd38c7598b)
+    URL_HASH MD5=15ab81bf8cfbdb9a9a3b3abd38c7598b
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 
   FetchContent_MakeAvailable(ext_sqlite3)
   target_include_directories(sqlite3 PUBLIC ${sqlite3_SOURCE_DIR}/src)
